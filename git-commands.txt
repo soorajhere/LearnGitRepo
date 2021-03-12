@@ -1,0 +1,54 @@
+git - install git 
+
+create a folder and do git init so that that folder will be considered as project folder
+
+go to the folder in the command line interface - create files and do git add filename
+
+--files gets added to cache
+
+
+
+Update github with local changes
+---------------------------------------
+git clone HTTPS URL
+make changes locally, then
+git add login.php
+git commit -m "Fixed bug in login.php"
+git push origin my_branch
+---------------------------------------
+
+
+-----rename branch from master to main-----------
+if default branch is changed to master from main when you push files from local, rename it back to main
+from repo -settings - branch - default branch - rename
+
+after that, to update local repo use below commands
+
+git branch -m master main
+git fetch origin
+git branch -u origin/main main
+
+-----------------------------------------------------------
+
+
+
+git commit filename  - file committed to git repo
+
+git log - list down the commitId for the branch
+
+git branch feature - create a branch with name feature
+
+git checkout feature - head moved to feature branch..
+
+git checkout master - head moved to master
+
+git merge feature - merge the feature branch to master
+
+git diff - shows diff in file contents 
+
+git hub path - https://github.com/soorajhere/LearnGitRepo.git
+personal token - c6711314dc2fc3873a4f0960a961f2401713e4c3
+
+
+1. customapps supported by cts - but dont have source code-
+2. retired apps - what is the reason for retirement-
