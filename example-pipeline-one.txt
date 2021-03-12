@@ -1,0 +1,208 @@
+# this example is to create a pipeline using aws cli commands using code build stage
+
+  rCodeBuildProject:
+    Type: "AWS::CodeBuild::Project"
+    Properties:
+      Name: !Sub '${pNamePrefix}-${pService}-${AWS::Region}-BUILDPROJECT'
+      ServiceRole: !Ref rCodeBuildProjectRole
+      BadgeEnabled: False
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        PrivilegedMode: False
+        Image: aws/codebuild/standard:5.0
+      Source:
+        Type: CODEPIPELINE
+        # https://docs.aws.amazon.com/codebuild/latest/userguide/build-spec-ref.html
+        BuildSpec: 'buildspec-spoke.yml'
+      TimeoutInMinutes: 15
+      Cache:
+        Type: NO_CACHE
+      Tags:
+        - Key: "AppID"
+          Value: !Ref pAppID
+
+  rCodeBuildCreateStackDevProject:
+    Type: "AWS::CodeBuild::Project"
+    Properties:
+      Name: !Sub '${pNamePrefix}-${pService}-${AWS::Region}-BUILDPROJECTDev'
+      ServiceRole: !Ref rCodeBuildProjectRole
+      BadgeEnabled: False
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        PrivilegedMode: False
+        Image: aws/codebuild/standard:5.0
+      Source:
+        Type: CODEPIPELINE
+        # https://docs.aws.amazon.com/codebuild/latest/userguide/build-spec-ref.html
+        BuildSpec: 'buildspec-dev.yml'
+      TimeoutInMinutes: 15
+      Cache:
+        Type: NO_CACHE
+      Tags:
+        - Key: "AppID"
+          Value: !Ref pAppID
+
+  rCodeBuildCreateStackQAProject:
+    Type: "AWS::CodeBuild::Project"
+    Properties:
+      Name: !Sub '${pNamePrefix}-${pService}-${AWS::Region}-BUILDPROJECTQA'
+      ServiceRole: !Ref rCodeBuildProjectRole
+      BadgeEnabled: False
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        PrivilegedMode: False
+        Image: aws/codebuild/standard:5.0
+      Source:
+        Type: CODEPIPELINE
+        # https://docs.aws.amazon.com/codebuild/latest/userguide/build-spec-ref.html
+        BuildSpec: 'buildspec-qa.yml'
+      TimeoutInMinutes: 15
+      Cache:
+        Type: NO_CACHE
+      Tags:
+        - Key: "AppID"
+          Value: !Ref pAppID
+
+  rCodeBuildCreateStackProdProject:
+    Type: "AWS::CodeBuild::Project"
+    Properties:
+      Name: !Sub '${pNamePrefix}-${pService}-${AWS::Region}-BUILDPROJECTProd'
+      ServiceRole: !Ref rCodeBuildProjectRole
+      BadgeEnabled: False
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        PrivilegedMode: False
+        Image: aws/codebuild/standard:5.0
+      Source:
+        Type: CODEPIPELINE
+        # https://docs.aws.amazon.com/codebuild/latest/userguide/build-spec-ref.html
+        BuildSpec: 'buildspec-prod.yml'
+      TimeoutInMinutes: 15
+      Cache:
+        Type: NO_CACHE
+      Tags:
+        - Key: "AppID"
+          Value: !Ref pAppID                    
+                     
+  rCodePipeline:
+    Type: "AWS::CodePipeline::Pipeline"
+    Properties:
+      Name: !Sub '${pNamePrefix}-${pService}-${AWS::Region}-CODEPIPELINE-Latest'
+      RoleArn: !GetAtt rCodePipelineRole.Arn
+      ArtifactStore:
+        Type: S3
+        Location: !Ref pS3BucketName
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: SourceAction
+              ActionTypeId:
+                Category: Source
+                Owner: ThirdParty
+                Version: '1'
+                Provider: GitHub
+              OutputArtifacts:
+                - Name: SourceArtifact
+              Configuration:
+                Owner: !Ref pGitHubAccount
+                Repo: !Ref pGitHubRepo
+                PollForSourceChanges: true
+                Branch: !Ref pGitHubRepoBranch
+                OAuthToken: !Ref pGithubToken
+              RunOrder: 1        
+        - Name: Build
+          Actions:
+            - Name: CodeBuild
+              InputArtifacts:
+                - Name: SourceArtifact            
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              OutputArtifacts:
+                - Name: BuildArtifact
+              Configuration:
+                ProjectName: !Ref rCodeBuildProject
+              RunOrder: 1
+        - Name: CreateStackDev
+          Actions:
+            - Name: CodeBuild
+              InputArtifacts:
+                - Name: SourceArtifact            
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              OutputArtifacts:
+                - Name: BuildArtifactDev
+              Configuration:
+                ProjectName: !Ref rCodeBuildCreateStackDevProject
+              RunOrder: 1              
+        - Name: QAApproval
+          Actions:
+            - Name: QAApproval
+              ActionTypeId:
+                Category: Approval
+                Owner: AWS
+                Version: 1
+                Provider: Manual
+              Configuration:
+                NotificationArn: 'arn:aws:sns:us-west-2:acctno:codepipeline-approval'
+                CustomData: Please Approve QA Deployment
+              RunOrder: 1
+        - Name: CreateStackQA
+          Actions:
+            - Name: CodeBuild
+              InputArtifacts:
+                - Name: SourceArtifact            
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              OutputArtifacts:
+                - Name: BuildArtifactQA
+              Configuration:
+                ProjectName: !Ref rCodeBuildCreateStackQAProject
+              RunOrder: 1                        
+        - Name: ProductionApproval
+          Actions:
+            - Name: ProdApproval
+              ActionTypeId:
+                Category: Approval
+                Owner: AWS
+                Version: 1
+                Provider: Manual
+              Configuration:
+                NotificationArn: 'arn:aws:sns:us-west-2:acctno:codepipeline-approval'
+                CustomData: Please Approve Production Deployment
+              RunOrder: 1
+        - Name: CreateStackProd
+          Actions:
+            - Name: CodeBuild
+              InputArtifacts:
+                - Name: SourceArtifact            
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              OutputArtifacts: 
+                - Name: BuildArtifactProd                
+              Configuration:
+                ProjectName: !Ref rCodeBuildCreateStackProdProject
+              RunOrder: 1
