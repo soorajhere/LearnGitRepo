@@ -25,24 +25,23 @@ Parameters:
   pGitHubAccount:
     Type: 'String'
     Default: 'pgetech'
-    Description: "Enter the GitHub Account Name (e.g. pgetech)"
+    Description: "Enter the GitHub Account Name"
   pGitHubRepo:
     Type: 'String'
     Description: "Enter the GitHub Repo Name "
-    Default: 'aws-logging-central-elbaccesslogs'
+    Default: 'elbaccesslogs'
   pGitHubRepoBranch:
     Type: 'String'
     Default: 'master'
     Description: "Enter the Branch you wish to pull from in the GitHub repo"
   pGithubToken:
     Type: 'String'
-    Description: "Enter the Github token for pipeline"
-    Default: 'aa4d24ac71b11e0b0e55a26efbb35ee396a48bc5'
+    Description: "Enter the Github token for pipeline"   
     NoEcho: true
   pAppID:
     Type: 'String'
     Description: "AMPS ApplicationID" 
-    Default: 'APP-2102'
+    Default: 'APP-No'
   pService:
     Type: 'String'
     Description: "The service name"
@@ -50,11 +49,11 @@ Parameters:
   pNamePrefix:
     Type: 'String'
     Description: "Prefix for pipeline name"
-    Default: 'ccoe-loggingcentral' 
+    Default: 'predix to use' 
   pS3BucketName:
     Type: 'String'
     Description: "S3 Bucket Name"
-    Default: 'codepipeline-us-west-2-817046420959-artifacts'
+    Default: 'codepipeline-us-west-2-acctno-artifacts'
  
 
 
@@ -86,7 +85,7 @@ Resources:
                   - !Sub arn:aws:s3:::${pS3BucketName}/*
                   - !Sub arn:aws:s3:::${pS3BucketName} 
                   - !GetAtt rCodeBuildProject.Arn
-                  - arn:aws:sns:us-west-2:686137062481:ccoe-loggincentral-codepipeline-approval
+                  - arn:aws:sns:us-west-2:acctno:codepipeline-approval
               - Effect: Allow
                 Action:
                   - logs:DescribeLogGroups
@@ -212,13 +211,13 @@ Resources:
                 Version: 1
               RunOrder: 1
               Configuration:
-                DeploymentTargets: '884690872852'
+                DeploymentTargets: 'acctno'
                 FailureTolerancePercentage: '20'
                 MaxConcurrentPercentage: '25'
                 PermissionModel: SELF_MANAGED
                 Capabilities: CAPABILITY_NAMED_IAM
                 Regions: us-west-2
-                StackSetName: !Sub '${pNamePrefix}-${pService}-LoggingHub-Dev'
+                StackSetName: !Sub '${pNamePrefix}-${pService}Dev'
                 TemplatePath: 'BuildArtifact::LambdaS3toES-Cloudformation.yml'
                 Parameters: 'BuildArtifact::param-dev.json'              
               OutputArtifacts: []
@@ -235,7 +234,7 @@ Resources:
                 Version: 1
                 Provider: Manual
               Configuration:
-                NotificationArn: 'arn:aws:sns:us-west-2:686137062481:ccoe-loggincentral-codepipeline-approval'
+                NotificationArn: 'arn:aws:sns:us-west-2:acctno:codepipeline-approval'
                 CustomData: Please Approve Production Deployment
               RunOrder: 1
         - Name: DeployProdStackSet
@@ -248,13 +247,13 @@ Resources:
                 Version: 1
               RunOrder: 1
               Configuration:
-                DeploymentTargets: '801458782278'
+                DeploymentTargets: 'acctno'
                 FailureTolerancePercentage: '20'
                 MaxConcurrentPercentage: '25'
                 PermissionModel: SELF_MANAGED
                 Capabilities: CAPABILITY_NAMED_IAM
                 Regions: us-west-2
-                StackSetName: !Sub '${pNamePrefix}-${pService}-LoggingHub-Prod'
+                StackSetName: !Sub '${pNamePrefix}-${pService}'
                 TemplatePath: 'BuildArtifact::LambdaS3toES-Cloudformation.yml'
                 Parameters: 'BuildArtifact::param-prod.json'              
               OutputArtifacts: []
