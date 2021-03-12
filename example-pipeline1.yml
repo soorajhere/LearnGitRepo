@@ -1,0 +1,368 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+### Metadata
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "GitHub Details"
+        Parameters:
+          - pGitHubAccount
+          - pGitHubRepo
+          - pGitHubRepoBranch        
+
+    ParameterLabels:
+      pGitHubAccount:
+        default: "GitHub Account"
+      pGitHubRepo:
+        default: "Repository Name"
+      pGitHubRepoBranch:
+        default: "Repository Branch"                
+
+### Parameters
+Parameters:
+  #GitHub Details
+  pGitHubAccount:
+    Type: 'String'
+    Default: 'pgetech'
+    Description: "Enter the GitHub Account Name (e.g. pgetech)"
+  pGitHubRepo:
+    Type: 'String'
+    Description: "Enter the GitHub Repo Name "
+    Default: 'aws-logging-central-spoke'
+  pGitHubRepoBranch:
+    Type: 'String'
+    Default: 'main'
+    Description: "Enter the Branch you wish to pull from in the GitHub repo"
+  pGithubToken:
+    Type: 'String'
+    Description: "Enter the Github token for pipeline"
+    Default: 'aa4d24ac71b11e0b0e55a26efbb35ee396a48bc5'
+    NoEcho: true
+  pAppID:
+    Type: 'String'
+    Description: "AMPS ApplicationID" 
+    Default: 'APP-2102'
+  pService:
+    Type: 'String'
+    Description: "The stackset service name"
+    Default: 'autosubscribe-lambda-spoke'
+  pNamePrefix:
+    Type: 'String'
+    Description: "Prefix for pipeline name"
+    Default: 'ccoe-loggingcentral' 
+  pS3BucketName:
+    Type: 'String'
+    Description: "S3 Bucket Name"
+    Default: 'codepipeline-us-west-2-817046420959-artifacts-spoke'
+
+
+Resources:
+
+#Roles
+  rCodePipelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+   #   RoleName: !Sub '${pNamePrefix}-${pService}-${AWS::Region}-CODEPIPELINE-ROLE'
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: {Service: [codepipeline.amazonaws.com]}
+            Action: "sts:AssumeRole"
+          - Effect: Allow
+            Principal: {AWS: [arn:aws:iam::956254777756:role/AWSCloudFormationStackSetExecutionRole]}
+            Action: "sts:AssumeRole"
+          - Effect: Allow
+            Principal: {AWS: [arn:aws:iam::739846873405:role/loggingcentral-codepipeline-rCodeBuildProjectRole-YAOQHBJKDHUQ]}
+            Action: "sts:AssumeRole"                      
+      Path: /
+      Policies:
+        - PolicyName: "rCodePipelinePolicy"
+          PolicyDocument: 
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:*
+                  - sns:*                  
+                Resource: 
+                  - !Sub arn:aws:s3:::${pS3BucketName}/*
+                  - !Sub arn:aws:s3:::${pS3BucketName} 
+                  - arn:aws:sns:us-west-2:686137062481:ccoe-loggincentral-codepipeline-approval
+              - Effect: Allow
+                Action:
+                  - codebuild:*
+                  - logs:DescribeLogGroups
+                  - logs:CreateLogGroup
+                  - logs:GetLogEvents
+                  - logs:CreateLogStream
+                  - logs:FilterLogEvents
+                  - logs:PutLogEvents
+                  - s3:PutObject
+                  - cloudformation:*
+                Resource: 
+                  - '*'
+              - Effect: Allow
+                Action:
+                  - sts:AssumeRole
+                Resource:
+                  - arn:aws:iam::956254777756:role/service-role/CloudWatchAutoSubscribeLambdaSpokeDev-codebuild-service-role
+                  - arn:aws:iam::739846873405:role/loggingcentral-codepipeline-rCodeBuildProjectRole-YAOQHBJKDHUQ
+
+  rCodeBuildProjectRole:
+    Type: AWS::IAM::Role
+    Properties:
+      #RoleName: !Sub '${pNamePrefix}-${pService}-${AWS::Region}-CODEBUILD-ROLE'
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: {Service: [codebuild.amazonaws.com]}
+            Action: "sts:AssumeRole"
+          - Effect: Allow
+            Principal: {AWS: [arn:aws:iam::956254777756:role/AWSCloudFormationStackSetExecutionRole]}
+            Action: "sts:AssumeRole"
+          - Effect: Allow
+            Principal: {AWS: [arn:aws:iam::739846873405:role/loggingcentral-codepipeline-rCodeBuildProjectRole-YAOQHBJKDHUQ]}
+            Action: "sts:AssumeRole"            
+      Path: /
+      Policies:
+        - PolicyName: "rCodeBuildProjectPolicy"
+          PolicyDocument: 
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:*
+                Resource: 
+                  - !Sub arn:aws:s3:::${pS3BucketName}/*
+                  - !Sub arn:aws:s3:::${pS3BucketName}
+                  - arn:aws:s3:::ccoe-loggingcentral-pipeline-lambda-spoke/*
+                  - arn:aws:s3:::ccoe-loggingcentral-pipeline-lambda-spoke
+              - Effect: Allow
+                Action:
+                  - codebuild:*
+                  - cloudformation:*
+                  - logs:DescribeLogGroups
+                  - logs:CreateLogGroup
+                  - logs:GetLogEvents
+                  - logs:CreateLogStream
+                  - logs:FilterLogEvents
+                  - logs:PutLogEvents
+                  - s3:PutObject
+                Resource: 
+                  - '*'
+              - Effect: Allow
+                Action:
+                  - sts:AssumeRole
+                Resource:
+                  - arn:aws:iam::956254777756:role/service-role/CloudWatchAutoSubscribeLambdaSpokeDev-codebuild-service-role
+                  - arn:aws:iam::739846873405:role/loggingcentral-codepipeline-rCodeBuildProjectRole-YAOQHBJKDHUQ
+
+  rCodeBuildProject:
+    Type: "AWS::CodeBuild::Project"
+    Properties:
+      Name: !Sub '${pNamePrefix}-${pService}-${AWS::Region}-BUILDPROJECT'
+      ServiceRole: !Ref rCodeBuildProjectRole
+      BadgeEnabled: False
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        PrivilegedMode: False
+        Image: aws/codebuild/standard:5.0
+      Source:
+        Type: CODEPIPELINE
+        # https://docs.aws.amazon.com/codebuild/latest/userguide/build-spec-ref.html
+        BuildSpec: 'buildspec-spoke.yml'
+      TimeoutInMinutes: 15
+      Cache:
+        Type: NO_CACHE
+      Tags:
+        - Key: "AppID"
+          Value: !Ref pAppID
+
+  rCodeBuildCreateStackDevProject:
+    Type: "AWS::CodeBuild::Project"
+    Properties:
+      Name: !Sub '${pNamePrefix}-${pService}-${AWS::Region}-BUILDPROJECTDev'
+      ServiceRole: !Ref rCodeBuildProjectRole
+      BadgeEnabled: False
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        PrivilegedMode: False
+        Image: aws/codebuild/standard:5.0
+      Source:
+        Type: CODEPIPELINE
+        # https://docs.aws.amazon.com/codebuild/latest/userguide/build-spec-ref.html
+        BuildSpec: 'buildspec-dev.yml'
+      TimeoutInMinutes: 15
+      Cache:
+        Type: NO_CACHE
+      Tags:
+        - Key: "AppID"
+          Value: !Ref pAppID
+
+  rCodeBuildCreateStackQAProject:
+    Type: "AWS::CodeBuild::Project"
+    Properties:
+      Name: !Sub '${pNamePrefix}-${pService}-${AWS::Region}-BUILDPROJECTQA'
+      ServiceRole: !Ref rCodeBuildProjectRole
+      BadgeEnabled: False
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        PrivilegedMode: False
+        Image: aws/codebuild/standard:5.0
+      Source:
+        Type: CODEPIPELINE
+        # https://docs.aws.amazon.com/codebuild/latest/userguide/build-spec-ref.html
+        BuildSpec: 'buildspec-qa.yml'
+      TimeoutInMinutes: 15
+      Cache:
+        Type: NO_CACHE
+      Tags:
+        - Key: "AppID"
+          Value: !Ref pAppID
+
+  rCodeBuildCreateStackProdProject:
+    Type: "AWS::CodeBuild::Project"
+    Properties:
+      Name: !Sub '${pNamePrefix}-${pService}-${AWS::Region}-BUILDPROJECTProd'
+      ServiceRole: !Ref rCodeBuildProjectRole
+      BadgeEnabled: False
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        PrivilegedMode: False
+        Image: aws/codebuild/standard:5.0
+      Source:
+        Type: CODEPIPELINE
+        # https://docs.aws.amazon.com/codebuild/latest/userguide/build-spec-ref.html
+        BuildSpec: 'buildspec-prod.yml'
+      TimeoutInMinutes: 15
+      Cache:
+        Type: NO_CACHE
+      Tags:
+        - Key: "AppID"
+          Value: !Ref pAppID                    
+                     
+  rCodePipeline:
+    Type: "AWS::CodePipeline::Pipeline"
+    Properties:
+      Name: !Sub '${pNamePrefix}-${pService}-${AWS::Region}-CODEPIPELINE-Latest'
+      RoleArn: !GetAtt rCodePipelineRole.Arn
+      ArtifactStore:
+        Type: S3
+        Location: !Ref pS3BucketName
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: SourceAction
+              ActionTypeId:
+                Category: Source
+                Owner: ThirdParty
+                Version: '1'
+                Provider: GitHub
+              OutputArtifacts:
+                - Name: SourceArtifact
+              Configuration:
+                Owner: !Ref pGitHubAccount
+                Repo: !Ref pGitHubRepo
+                PollForSourceChanges: true
+                Branch: !Ref pGitHubRepoBranch
+                OAuthToken: !Ref pGithubToken
+              RunOrder: 1        
+        - Name: Build
+          Actions:
+            - Name: CodeBuild
+              InputArtifacts:
+                - Name: SourceArtifact            
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              OutputArtifacts:
+                - Name: BuildArtifact
+              Configuration:
+                ProjectName: !Ref rCodeBuildProject
+              RunOrder: 1
+        - Name: CreateStackDev
+          Actions:
+            - Name: CodeBuild
+              InputArtifacts:
+                - Name: SourceArtifact            
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              OutputArtifacts:
+                - Name: BuildArtifactDev
+              Configuration:
+                ProjectName: !Ref rCodeBuildCreateStackDevProject
+              RunOrder: 1              
+        - Name: QAApproval
+          Actions:
+            - Name: QAApproval
+              ActionTypeId:
+                Category: Approval
+                Owner: AWS
+                Version: 1
+                Provider: Manual
+              Configuration:
+                NotificationArn: 'arn:aws:sns:us-west-2:686137062481:ccoe-loggincentral-codepipeline-approval'
+                CustomData: Please Approve QA Deployment
+              RunOrder: 1
+        - Name: CreateStackQA
+          Actions:
+            - Name: CodeBuild
+              InputArtifacts:
+                - Name: SourceArtifact            
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              OutputArtifacts:
+                - Name: BuildArtifactQA
+              Configuration:
+                ProjectName: !Ref rCodeBuildCreateStackQAProject
+              RunOrder: 1                        
+        - Name: ProductionApproval
+          Actions:
+            - Name: ProdApproval
+              ActionTypeId:
+                Category: Approval
+                Owner: AWS
+                Version: 1
+                Provider: Manual
+              Configuration:
+                NotificationArn: 'arn:aws:sns:us-west-2:686137062481:ccoe-loggincentral-codepipeline-approval'
+                CustomData: Please Approve Production Deployment
+              RunOrder: 1
+        - Name: CreateStackProd
+          Actions:
+            - Name: CodeBuild
+              InputArtifacts:
+                - Name: SourceArtifact            
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              OutputArtifacts: 
+                - Name: BuildArtifactProd                
+              Configuration:
+                ProjectName: !Ref rCodeBuildCreateStackProdProject
+              RunOrder: 1
