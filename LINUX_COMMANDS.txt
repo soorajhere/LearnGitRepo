@@ -1,0 +1,130 @@
+Account No - 979220073789
+
+Linux commands for aws
+-----------------------
+sudo su - switch to root user
+
+yum install httpd -y
+
+service httpd status 
+service httpd start
+
+cd / dir
+ls
+clear
+
+chkconfig httpd on - service will start when ec2 instance is started
+
+rm filename - delete file
+echo "text" > /var/www/html/index.html
+cat index.html
+
+open nano text editor
+---------------------
+nano filename or nano
+ctrl+s - save file
+ctrl+x - exit
+
+ssh to another private ip instnace
+------------------------------------
+first save the key file in the public instnace
+ssh -i awskeyfilename ec2-user@private_ip
+
+if it shows permission error, then use
+chmod 400 awskeyfilename
+now try again
+ssh -i awskeyfilename ec2-user@private_ip
+
+installing mysql client in an ec2 instance
+------------------------------------------
+yum install -y https://dev.mysql.com/get/mysql57-community-release-el7-11.noarch.rpm
+yum install -y mysql-community-client
+
+connecting to a rds mysql database from ec2
+-------------------------------------------
+[root@ip-172-31-16-111 ec2-user]# mysql -h fnf-264915-rds.crpoplx8gbw4.us-east-2.rds.amazonaws.com -P 3306 -u admin -p
+
+installing php
+--------------
+sudo yum install php-mysql php php-xml php-mcrypt php-mbstring php-cli mysql
+
+vi editor save and exit
+-----------------------
+ESC :x
+ESC :q - without saving
+
+Connecting to a dynamo db programatically
+-----------------------------------------
+
+.net, java, php, node - any of these can be used. Below sample is with node.js
+
+launch a linux instance.
+install node.js first in the linux ec2 instance.
+install aws-sdk using the command npm install aws-sdk
+configure aws using the command aws configure  - provide access key and secret key - this will get stored in the credentials 
+	file and will be used in the background. Path is ~/.aws/credentials
+create a node.js module. For this, open vi editor, create the code, save it with a filename.js file
+	for example, code to list all tables in dynamo db
+now, run the node.js module using the command > node filename.js
+this will run the js code and will provide the output.
+
+Connecting to DocumentDB from AWS cloud9 environment
+----------------------------------------------------
+Create a document db cluster in aws console
+Create a cloud9 instance, which is a browser based IDE from aws
+Create a security group and allow inbound port 27017 and source is the cloud 9 instance ip
+In the DocumentDB cluster configuration, use the security group created in step 2.
+login to cloud9 environment and install mongodb shell using the command line
+Get the connection string from document db connectivity tab
+From cloud9 ide command shell, run the url and provide the master db password.
+Once connected, the command prompt will be rs0:PRIMARY>
+
+
+        "ParameterKey": "CodeBucketKeyVersionId",
+        "ParameterValue": "98V61m1D84ORyGd.QbXD83KWZAc26kfR"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
