@@ -1,0 +1,264 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+### Metadata
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "GitHub Details"
+        Parameters:
+          - pGitHubAccount
+          - pGitHubRepo
+          - pGitHubRepoBranch        
+
+    ParameterLabels:
+      pGitHubAccount:
+        default: "GitHub Account"
+      pGitHubRepo:
+        default: "Repository Name"
+      pGitHubRepoBranch:
+        default: "Repository Branch"                
+
+### Parameters
+Parameters:
+  #GitHub Details
+  pGitHubAccount:
+    Type: 'String'
+    Default: 'pgetech'
+    Description: "Enter the GitHub Account Name (e.g. pgetech)"
+  pGitHubRepo:
+    Type: 'String'
+    Description: "Enter the GitHub Repo Name "
+    Default: 'aws-logging-central-elbaccesslogs'
+  pGitHubRepoBranch:
+    Type: 'String'
+    Default: 'master'
+    Description: "Enter the Branch you wish to pull from in the GitHub repo"
+  pGithubToken:
+    Type: 'String'
+    Description: "Enter the Github token for pipeline"
+    Default: 'aa4d24ac71b11e0b0e55a26efbb35ee396a48bc5'
+    NoEcho: true
+  pAppID:
+    Type: 'String'
+    Description: "AMPS ApplicationID" 
+    Default: 'APP-2102'
+  pService:
+    Type: 'String'
+    Description: "The service name"
+    Default: 'ELBAccessLogs-injesterlambda'
+  pNamePrefix:
+    Type: 'String'
+    Description: "Prefix for pipeline name"
+    Default: 'ccoe-loggingcentral' 
+  pS3BucketName:
+    Type: 'String'
+    Description: "S3 Bucket Name"
+    Default: 'codepipeline-us-west-2-817046420959-artifacts'
+ 
+
+
+Resources:
+
+#Roles
+  rCodePipelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+   #   RoleName: !Sub '${pNamePrefix}-${pService}-${AWS::Region}-CODEPIPELINE-ROLE'
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: {Service: [codepipeline.amazonaws.com]}
+            Action: "sts:AssumeRole"
+      Path: /
+      Policies:
+        - PolicyName: "rCodePipelinePolicy"
+          PolicyDocument: 
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:*
+                  - sns:*
+                  - codebuild:*
+                Resource: 
+                  - !Sub arn:aws:s3:::${pS3BucketName}/*
+                  - !Sub arn:aws:s3:::${pS3BucketName} 
+                  - !GetAtt rCodeBuildProject.Arn
+                  - arn:aws:sns:us-west-2:686137062481:ccoe-loggincentral-codepipeline-approval
+              - Effect: Allow
+                Action:
+                  - logs:DescribeLogGroups
+                  - logs:CreateLogGroup
+                  - logs:GetLogEvents
+                  - logs:CreateLogStream
+                  - logs:FilterLogEvents
+                  - logs:PutLogEvents
+                  - s3:PutObject
+                  - cloudformation:*
+                Resource: 
+                  - '*'
+
+  rCodeBuildProjectRole:
+    Type: AWS::IAM::Role
+    Properties:
+      #RoleName: !Sub '${pNamePrefix}-${pService}-${AWS::Region}-CODEBUILD-ROLE'
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: {Service: [codebuild.amazonaws.com]}
+            Action: "sts:AssumeRole"
+      Path: /
+      Policies:
+        - PolicyName: "rCodeBuildProjectPolicy"
+          PolicyDocument: 
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:*
+                  - codebuild:*
+                Resource: 
+                  - !Sub arn:aws:s3:::${pS3BucketName}/*
+                  - !Sub arn:aws:s3:::${pS3BucketName}
+                  - arn:aws:codebuild:::*
+              - Effect: Allow
+                Action:
+                  - cloudformation:*
+                  - logs:DescribeLogGroups
+                  - logs:CreateLogGroup
+                  - logs:GetLogEvents
+                  - logs:CreateLogStream
+                  - logs:FilterLogEvents
+                  - logs:PutLogEvents
+                  - s3:PutObject
+                Resource: 
+                  - '*'
+
+  rCodeBuildProject:
+    Type: "AWS::CodeBuild::Project"
+    Properties:
+      Name: !Sub '${pNamePrefix}-${pService}-${AWS::Region}-BUILDPROJECT'
+      ServiceRole: !Ref rCodeBuildProjectRole
+      BadgeEnabled: False
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        PrivilegedMode: False
+        Image: aws/codebuild/standard:5.0
+      Source:
+        Type: CODEPIPELINE
+        # https://docs.aws.amazon.com/codebuild/latest/userguide/build-spec-ref.html
+        BuildSpec: 'buildspec.yml'
+      TimeoutInMinutes: 15
+      Cache:
+        Type: NO_CACHE
+      Tags:
+        - Key: "AppID"
+          Value: !Ref pAppID
+                     
+  rCodePipeline:
+    Type: "AWS::CodePipeline::Pipeline"
+    Properties:
+      Name: !Sub '${pNamePrefix}-elbaccesslogs-hub-injesterlambda-CODEPIPELINE'
+      RoleArn: !GetAtt rCodePipelineRole.Arn
+      ArtifactStore:
+        Type: S3
+        Location: !Ref pS3BucketName
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: SourceAction
+              ActionTypeId:
+                Category: Source
+                Owner: ThirdParty
+                Version: '1'
+                Provider: GitHub
+              OutputArtifacts:
+                - Name: SourceArtifact
+              Configuration:
+                Owner: !Ref pGitHubAccount
+                Repo: !Ref pGitHubRepo
+                PollForSourceChanges: true
+                Branch: !Ref pGitHubRepoBranch
+                OAuthToken: !Ref pGithubToken
+              RunOrder: 1        
+        - Name: Build
+          Actions:
+            - Name: CodeBuild
+              InputArtifacts:
+                - Name: SourceArtifact            
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              OutputArtifacts:
+                - Name: BuildArtifact
+              Configuration:
+                ProjectName: !Ref rCodeBuildProject
+              RunOrder: 1
+        - Name: DeployDevStackSet
+          Actions:
+            - Name: DeployStacketDev
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CloudFormationStackSet
+                Version: 1
+              RunOrder: 1
+              Configuration:
+                DeploymentTargets: '884690872852'
+                FailureTolerancePercentage: '20'
+                MaxConcurrentPercentage: '25'
+                PermissionModel: SELF_MANAGED
+                Capabilities: CAPABILITY_NAMED_IAM
+                Regions: us-west-2
+                StackSetName: !Sub '${pNamePrefix}-${pService}-LoggingHub-Dev'
+                TemplatePath: 'BuildArtifact::LambdaS3toES-Cloudformation.yml'
+                Parameters: 'BuildArtifact::param-dev.json'              
+              OutputArtifacts: []
+              InputArtifacts:
+                - Name: BuildArtifact
+              Region: us-west-2
+              Namespace: DeployDevVariables                                        
+        - Name: ProductionApproval
+          Actions:
+            - Name: ProdApproval
+              ActionTypeId:
+                Category: Approval
+                Owner: AWS
+                Version: 1
+                Provider: Manual
+              Configuration:
+                NotificationArn: 'arn:aws:sns:us-west-2:686137062481:ccoe-loggincentral-codepipeline-approval'
+                CustomData: Please Approve Production Deployment
+              RunOrder: 1
+        - Name: DeployProdStackSet
+          Actions:
+            - Name: DeployStacketProd
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CloudFormationStackSet
+                Version: 1
+              RunOrder: 1
+              Configuration:
+                DeploymentTargets: '801458782278'
+                FailureTolerancePercentage: '20'
+                MaxConcurrentPercentage: '25'
+                PermissionModel: SELF_MANAGED
+                Capabilities: CAPABILITY_NAMED_IAM
+                Regions: us-west-2
+                StackSetName: !Sub '${pNamePrefix}-${pService}-LoggingHub-Prod'
+                TemplatePath: 'BuildArtifact::LambdaS3toES-Cloudformation.yml'
+                Parameters: 'BuildArtifact::param-prod.json'              
+              OutputArtifacts: []
+              InputArtifacts:
+                - Name: BuildArtifact
+              Region: us-west-2
+              Namespace: DeployProdVariables
