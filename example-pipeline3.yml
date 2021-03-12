@@ -26,36 +26,35 @@ Parameters:
   pGitHubAccount:
     Type: 'String'
     Default: 'pgetech'
-    Description: "Enter the GitHub Account Name (e.g. pgetech)"
+    Description: "Enter the GitHub Account Name)"
   pGitHubRepo:
     Type: 'String'
     Description: "Enter the GitHub Repo Name "
-    Default: 'aws-logging-central-elbaccesslogs-spoke'
+    Default: 'repo name'
   pGitHubRepoBranch:
     Type: 'String'
     Default: 'main'
     Description: "Enter the Branch you wish to pull from in the GitHub repo"
   pGithubToken:
     Type: 'String'
-    Description: "Enter the Github token for pipeline"
-    Default: 'aa4d24ac71b11e0b0e55a26efbb35ee396a48bc5'
+    Description: "Enter the Github token for pipeline"    
     NoEcho: true
   pAppID:
     Type: 'String'
     Description: "AMPS ApplicationID" 
-    Default: 'APP-2102'
+    Default: 'APP-No'
   pService:
     Type: 'String'
     Description: "The stackset service name"
-    Default: 'elbaccesslogs-spoke'
+    
   pNamePrefix:
     Type: 'String'
     Description: "Prefix for pipeline name"
-    Default: 'ccoe-loggingcentral' 
+    
   pS3BucketName:
     Type: 'String'
     Description: "S3 Bucket Name"
-    Default: 'codepipeline-us-west-2-817046420959-artifacts-spoke'
+    Default: 'codepipeline-us-west-2-acctno-artifacts-spoke'
 
 Resources:
 
@@ -71,10 +70,10 @@ Resources:
             Principal: {Service: [codepipeline.amazonaws.com]}
             Action: "sts:AssumeRole"
           - Effect: Allow
-            Principal: {AWS: [arn:aws:iam::956254777756:role/AWSCloudFormationStackSetExecutionRole]}
+            Principal: {AWS: [arn:aws:iam::acctno:role/AWSCloudFormationStackSetExecutionRole]}
             Action: "sts:AssumeRole"
           - Effect: Allow
-            Principal: {AWS: [arn:aws:iam::739846873405:role/loggingcentral-codepipeline-rCodeBuildProjectRole-YAOQHBJKDHUQ]}
+            Principal: {AWS: [arn:aws:iam::acctno:role/codepipeline-rCodeBuildProjectRole]}
             Action: "sts:AssumeRole"                      
       Path: /
       Policies:
@@ -89,7 +88,7 @@ Resources:
                 Resource: 
                   - !Sub arn:aws:s3:::${pS3BucketName}/*
                   - !Sub arn:aws:s3:::${pS3BucketName} 
-                  - arn:aws:sns:us-west-2:686137062481:ccoe-loggincentral-codepipeline-approval
+                  - arn:aws:sns:us-west-2:acctno:codepipeline-approval
               - Effect: Allow
                 Action:
                   - codebuild:*
@@ -107,8 +106,8 @@ Resources:
                 Action:
                   - sts:AssumeRole
                 Resource:
-                  - arn:aws:iam::956254777756:role/service-role/CloudWatchAutoSubscribeLambdaSpokeDev-codebuild-service-role
-                  - arn:aws:iam::739846873405:role/loggingcentral-codepipeline-rCodeBuildProjectRole-YAOQHBJKDHUQ
+                  - arn:aws:iam::acctno:role/service-role/CloudWatchAutoSubscribeLambdaSpokeDev-codebuild-service-role
+                  - arn:aws:iam::acctno:role/codepipeline-rCodeBuildProjectRole
 
   rCodeBuildProjectRole:
     Type: AWS::IAM::Role
@@ -121,10 +120,10 @@ Resources:
             Principal: {Service: [codebuild.amazonaws.com]}
             Action: "sts:AssumeRole"
           - Effect: Allow
-            Principal: {AWS: [arn:aws:iam::956254777756:role/AWSCloudFormationStackSetExecutionRole]}
+            Principal: {AWS: [arn:aws:iam::acctno:role/AWSCloudFormationStackSetExecutionRole]}
             Action: "sts:AssumeRole"
           - Effect: Allow
-            Principal: {AWS: [arn:aws:iam::739846873405:role/loggingcentral-codepipeline-rCodeBuildProjectRole-YAOQHBJKDHUQ]}
+            Principal: {AWS: [arn:aws:iam::acctno:role/codepipeline-rCodeBuildProjectRole]}
             Action: "sts:AssumeRole"            
       Path: /
       Policies:
@@ -138,8 +137,8 @@ Resources:
                 Resource: 
                   - !Sub arn:aws:s3:::${pS3BucketName}/*
                   - !Sub arn:aws:s3:::${pS3BucketName}
-                  - arn:aws:s3:::ccoe-loggingcentral-pipeline-lambda-spoke/*
-                  - arn:aws:s3:::ccoe-loggingcentral-pipeline-lambda-spoke
+                  - arn:aws:s3:::ccoe--pipeline-lambda/*
+                  - arn:aws:s3:::ccoe--pipeline-lambda
               - Effect: Allow
                 Action:
                   - codebuild:*
@@ -157,8 +156,8 @@ Resources:
                 Action:
                   - sts:AssumeRole
                 Resource:
-                  - arn:aws:iam::956254777756:role/service-role/CloudWatchAutoSubscribeLambdaSpokeDev-codebuild-service-role
-                  - arn:aws:iam::739846873405:role/loggingcentral-codepipeline-rCodeBuildProjectRole-YAOQHBJKDHUQ
+                  - arn:aws:iam::acctno:role/service-role/CloudWatchAutoSubscribeLambdaSpokeDev-codebuild-service-role
+                  - arn:aws:iam::acctno:role/loggingcentral-codepipeline-rCodeBuildProjectRole
 
   rCodeBuildProject:
     Type: "AWS::CodeBuild::Project"
@@ -187,7 +186,7 @@ Resources:
   rCodeBuildCreateStackDevProject:
     Type: "AWS::CodeBuild::Project"
     Properties:
-      Name: !Sub '${pNamePrefix}-${pService}-${AWS::Region}-BUILDPROJECT-Dev'
+      Name: !Sub '${pNamePrefix}-${pService}-${AWS::Region}-BUILDPROJECT'
       ServiceRole: !Ref rCodeBuildProjectRole
       BadgeEnabled: False
       Artifacts:
@@ -319,7 +318,7 @@ Resources:
                 Version: 1
                 Provider: Manual
               Configuration:
-                NotificationArn: 'arn:aws:sns:us-west-2:686137062481:ccoe-loggincentral-codepipeline-approval'
+                NotificationArn: 'arn:aws:sns:us-west-2:acctno:codepipeline-approval'
                 CustomData: Please Approve QA Deployment
               RunOrder: 1
         - Name: CreateStackQA
